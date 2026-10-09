@@ -135,6 +135,7 @@
   .setbtn{width:100%; text-align:left; margin-top:10px; background:var(--surface);}
   .setbtn small{display:block; color:var(--dim); font-size:.78rem; margin-top:3px;}
   .hint{color:var(--dim); font-size:.82rem; line-height:1.45; margin-top:8px;}
+.bkban{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:14px 14px 14px 16px;border-radius:16px;border:1px solid #c89b3c;background:linear-gradient(135deg,#3a2f17,#1d1a14)}.bkban div{flex:1;min-width:0}.bkban b{display:block;color:#f3d98f;font-size:15px}.bkban span{display:block;color:#cdbf9c;font-size:13px;margin-top:3px;line-height:1.35}.bkban button{flex:none;border:0;border-radius:12px;padding:11px 14px;background:linear-gradient(135deg,#f3d98f,#c89b3c 60%,#a7782a);color:#14181d;font:700 14px Inter,sans-serif;cursor:pointer}
 .instbtn{display:block;width:100%;margin:0 0 14px;padding:16px;border:0;border-radius:16px;background:linear-gradient(135deg,#f3d98f,#c89b3c 60%,#a7782a);color:#14181d;font:700 17px Inter,sans-serif;box-shadow:0 6px 18px #0006;cursor:pointer}
 </style>
 </head>
@@ -2238,7 +2239,7 @@ function render(){
   const titles={mois:'Dépenses',rec:'Prélèvements',stats:'Analyse',set:'Réglages'};
   const nav=(tab==='mois'||tab==='stats'||tab==='rec')?`<div class="monthnav"><button onclick="shiftMonth(-1)" aria-label="Mois précédent">‹</button><b>${esc(monthLabel(cur))}</b><button onclick="shiftMonth(1)" aria-label="Mois suivant">›</button></div>`:'';
   let body='';
-  if(tab==='mois') body=installBanner()+viewMonth(); else if(tab==='rec') body=viewRec(); else if(tab==='stats') body=viewStats(); else body=viewSet();
+  if(tab==='mois') body=installBanner()+bkBanner()+viewMonth(); else if(tab==='rec') body=viewRec(); else if(tab==='stats') body=viewStats(); else body=viewSet();
   const fab = tab==='rec' ? `<button class="fab" onclick="editRec(null)">+ Prélèvement</button>` : (tab==='set'?'':`<button class="fab" onclick="editExp(null)">+ Dépense</button>`);
   $('#app').innerHTML=`<div class="wrap"><header><h1>${titles[tab]}${tab==='mois'||tab==='stats'?' <button class="srch" onclick="openSearch()" aria-label="Rechercher">🔍</button>':''}</h1>${nav}</header>${body}</div>${fab}
   <nav class="tabs"><div class="in">${[['mois','Mois'],['rec','Prélèvements'],['stats','Analyse'],['set','Réglages']].map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="setTab('${k}')">${ICONS[k]}${l}</button>`).join('')}</div></nav>`;
@@ -2358,7 +2359,7 @@ function viewSet(){
   return `<button class="setbtn" onclick="editBudget()"><b>💰 Budget mensuel</b><small>${data.budget>0?fmt(data.budget)+' par mois':'Non défini'}</small></button>
   <button class="setbtn" onclick="manageCats()"><b>🏷️ Mes catégories</b><small>${myCats().length?myCats().length+' catégorie'+(myCats().length>1?'s':'')+' créée'+(myCats().length>1?'s':'')+' par toi':'Renommer ou supprimer les catégories que tu crées'}</small></button>
   <input id="impfile" type="file" accept=".pdf,application/pdf,.csv,.txt,.xlsx,.xls,.ods,.ofx,.qfx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple style="display:none" onchange="onImportFile(this)">
-  <button class="setbtn" onclick="backupSave()"><b>💾 Sauvegarder mes données</b><small>Un fichier avec tout : dépenses, prélèvements, entrées, budget, catégories et tes relevés PDF. Garde-le précieusement.</small></button>
+  <button class="setbtn" onclick="backupSave()"><b>💾 Sauvegarder mes données</b><small>Un fichier avec tout : dépenses, prélèvements, entrées, budget, catégories et tes relevés PDF. Garde-le précieusement.<br><span style="color:var(--brass2)">${bkLastTxt()}</span></small></button>
   <button class="setbtn" onclick="document.getElementById('bkfile').click()"><b>📂 Restaurer une sauvegarde</b><small>Remet tes données à partir d'un fichier de sauvegarde (nouveau téléphone…)</small></button>
   <input id="bkfile" type="file" accept=".json,application/json" style="display:none" onchange="backupLoad(this)">
   <button class="setbtn" onclick="exportCsv()"><b>📄 Exporter en tableur (CSV)</b><small>Toutes tes dépenses et prélèvements, pour Excel ou Google Sheets</small></button>
@@ -2949,19 +2950,28 @@ async function backupSave(){
   for(const st of stmList()){ try{ const b=await stmBlob(st); if(b) files[st.id]=await blobToB64(b); else miss++; }catch(e){ miss++; } }
   const name='depenses-sauvegarde-'+todayStr()+'.json', blob=new Blob([JSON.stringify({app:'depenses', v:2, date:new Date().toISOString(), data, files})],{type:'application/json'});
   if(miss) toast('⚠️ '+miss+' relevé(s) PDF introuvable(s), le reste est sauvegardé');
-  try{ const d=window.claude&&claude.use?await claude.use('downloads'):null; if(d){ await d.save({filename:name, data:blob}); toast('✓ Sauvegarde enregistrée'); return; } }catch(e){ if(e&&e.code==='declined') return; }
-  try{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); toast('✓ Sauvegarde enregistrée'); }catch(e){ toast('Sauvegarde impossible ici'); }
+  try{ const d=window.claude&&claude.use?await claude.use('downloads'):null; if(d){ await d.save({filename:name, data:blob}); bkDone(); toast('✓ Sauvegarde enregistrée'); return; } }catch(e){ if(e&&e.code==='declined') return; }
+  try{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); bkDone(); toast('✓ Sauvegarde enregistrée'); }catch(e){ toast('Sauvegarde impossible ici'); }
 }
 let restoreData=null, restoreFiles={};
 async function backupLoad(inp){
   const f=inp.files&&inp.files[0]; inp.value=''; if(!f) return;
-  try{ const o=JSON.parse(await f.text()); const d=o&&o.app==='depenses'?o.data:o; if(!d||!Array.isArray(d.exp)) throw 0; restoreData=d; restoreFiles=(o&&o.files)||{};
+  try{ const o=JSON.parse(await f.text()); const d=o&&o.app==='depenses'?o.data:o; if(!d||!Array.isArray(d.exp)) throw 0; restoreData=d; restoreFiles=(o&&o.files)||{}; restoreDate=o.date||'';
     const dt=o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'';
     openModal(`<h2>Restaurer cette sauvegarde ?</h2><div class="hint">Sauvegarde${dt?' du '+esc(dt):''} : ${d.exp.length} dépense${d.exp.length>1?'s':''}, ${(d.rec||[]).length} prélèvement${(d.rec||[]).length>1?'s':''}${(d.inc||[]).length?', '+d.inc.length+' entrée'+(d.inc.length>1?'s':'')+' d\'argent':''}${Object.keys(restoreFiles).length?', '+Object.keys(restoreFiles).length+' relevé'+(Object.keys(restoreFiles).length>1?'s':'')+' PDF':''}.<br><b style="color:var(--text)">Elle remplace tout ce qu'il y a dans l'appli maintenant.</b></div><div class="row2"><button onclick="closeModal()">Annuler</button><button class="primary" onclick="backupApply()">Restaurer</button></div>`);
   }catch(e){ openModal(`<h2>Fichier non reconnu</h2><div class="hint">Choisis un fichier de sauvegarde « depenses-sauvegarde-….json » créé par l'appli.</div><div class="row2"><button class="primary" onclick="closeModal()">D'accord</button></div>`); }
 }
+const BK_KEY='depenses_lastbk', BK_DAYS=60; let restoreDate='';
+function bkGet(){ try{ const v=localStorage.getItem(BK_KEY); const t=v?new Date(v).getTime():NaN; return isNaN(t)?null:t; }catch(e){ return null; } }
+function bkSet(d){ try{ localStorage.setItem(BK_KEY,new Date(d||Date.now()).toISOString()); }catch(e){} }
+function bkDone(){ bkSet(); render(); }
+function bkDays(){ const t=bkGet(); return t==null?null:Math.floor((Date.now()-t)/86400000); }
+function bkLastTxt(){ const t=bkGet(); if(t==null) return 'Aucune sauvegarde faite sur cet appareil pour l\'instant.'; const n=bkDays();
+  return 'Dernière sauvegarde : '+new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+(n<=0?' (aujourd\'hui)':n===1?' (hier)':' (il y a '+n+' jours)'); }
+function bkBanner(){ if(bkGet()==null&&data.exp.length&&!localStorage.getItem('depenses_bkinit')){ try{ localStorage.setItem('depenses_bkinit','1'); }catch(e){} bkSet(); return ''; } const n=bkDays(); if(n!=null&&n<BK_DAYS) return '';
+  return `<div class="bkban"><div><b>💾 Pense à sauvegarder tes données</b><span>${n==null?'Tu n\'as encore jamais sauvegardé sur cet appareil.':'Ta dernière sauvegarde date de '+n+' jours.'} Une sauvegarde tous les 2 mois, c'est plus sûr.</span></div><button onclick="backupSave()">Sauvegarder</button></div>`; }
 async function backupApply(){ if(!restoreData) return;
-  const nd=Object.assign({v:1,exp:[],rec:[],budget:0,cats:[],paid:{}},restoreData), F=restoreFiles; restoreData=null; restoreFiles={};
+  const nd=Object.assign({v:1,exp:[],rec:[],budget:0,cats:[],paid:{}},restoreData), F=restoreFiles; restoreData=null; restoreFiles={}; bkSet(restoreDate||Date.now());
   closeModal(); toast('Restauration en cours…'); let bad=0;
   for(const st of (Array.isArray(nd.stm)?nd.stm:[])){
     const u=F[st.id]; if(!u) continue;

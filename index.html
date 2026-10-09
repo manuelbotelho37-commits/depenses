@@ -135,6 +135,7 @@
   .setbtn{width:100%; text-align:left; margin-top:10px; background:var(--surface);}
   .setbtn small{display:block; color:var(--dim); font-size:.78rem; margin-top:3px;}
   .hint{color:var(--dim); font-size:.82rem; line-height:1.45; margin-top:8px;}
+.instbtn{display:block;width:100%;margin:0 0 14px;padding:16px;border:0;border-radius:16px;background:linear-gradient(135deg,#f3d98f,#c89b3c 60%,#a7782a);color:#14181d;font:700 17px Inter,sans-serif;box-shadow:0 6px 18px #0006;cursor:pointer}
 </style>
 </head>
 <body>
@@ -2237,7 +2238,7 @@ function render(){
   const titles={mois:'Dépenses',rec:'Prélèvements',stats:'Analyse',set:'Réglages'};
   const nav=(tab==='mois'||tab==='stats'||tab==='rec')?`<div class="monthnav"><button onclick="shiftMonth(-1)" aria-label="Mois précédent">‹</button><b>${esc(monthLabel(cur))}</b><button onclick="shiftMonth(1)" aria-label="Mois suivant">›</button></div>`:'';
   let body='';
-  if(tab==='mois') body=viewMonth(); else if(tab==='rec') body=viewRec(); else if(tab==='stats') body=viewStats(); else body=viewSet();
+  if(tab==='mois') body=installBanner()+viewMonth(); else if(tab==='rec') body=viewRec(); else if(tab==='stats') body=viewStats(); else body=viewSet();
   const fab = tab==='rec' ? `<button class="fab" onclick="editRec(null)">+ Prélèvement</button>` : (tab==='set'?'':`<button class="fab" onclick="editExp(null)">+ Dépense</button>`);
   $('#app').innerHTML=`<div class="wrap"><header><h1>${titles[tab]}${tab==='mois'||tab==='stats'?' <button class="srch" onclick="openSearch()" aria-label="Rechercher">🔍</button>':''}</h1>${nav}</header>${body}</div>${fab}
   <nav class="tabs"><div class="in">${[['mois','Mois'],['rec','Prélèvements'],['stats','Analyse'],['set','Réglages']].map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="setTab('${k}')">${ICONS[k]}${l}</button>`).join('')}</div></nav>`;
@@ -2368,6 +2369,15 @@ function viewSet(){
 let fCat='courses', fPay='cb';
 function openModal(h){ $('#modal').innerHTML='<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">'+h+'</div></div>'; }
 function closeModal(){ $('#modal').innerHTML=''; }
+let instEvt=null;
+function isInstalled(){ return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true; }
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); instEvt=e; if(tab==='mois') render(); });
+window.addEventListener('appinstalled',()=>{ instEvt=null; toast('✓ Appli installée sur ton téléphone'); render(); });
+function installBanner(){ if(isInstalled()) return ''; return '<button class="instbtn" onclick="installApp()">📲 Installer sur mon téléphone</button>'; }
+async function installApp(){
+  if(instEvt){ const e=instEvt; instEvt=null; e.prompt(); try{ const r=await e.userChoice; if(r&&r.outcome==='accepted') toast('Installation en cours…'); }catch(x){} render(); return; }
+  openModal('<h2>Installer Dépenses</h2><p class="hint" style="font-size:15px;line-height:1.6">Chrome n\'a pas encore proposé l\'installation sur cette page. Fais comme ceci :<br><br><b>1.</b> Ferme cet onglet et rouvre l\'appli <b>Chrome</b>.<br><b>2.</b> Va à l\'adresse de Dépenses et attends quelques secondes.<br><b>3.</b> Appuie à nouveau sur ce bouton doré.<br><br>Si l\'icône Dépenses est déjà sur ton écran d\'accueil, ouvre-la simplement : l\'appli est déjà installée.</p><button class="primary" onclick="closeModal()">J\'ai compris</button>');
+}
 function setErr(t){ const e=$('#err'); if(e) e.textContent=t||''; }
 function catsHtml(){ return `<div class="cats" id="catgrid">${catGrid()}</div><div id="newcat"></div>`; }
 function catGrid(){ return allCatKeys().map(k=>{const c=catOf(k);return `<button type="button" class="${fCat===k?'on':''}" onclick="pickCat('${k}',this)"><span>${c.i}</span>${esc(c.l)}</button>`;}).join('')+`<button type="button" class="addcat" onclick="newCatForm()"><span>＋</span>Nouvelle</button>`; }

@@ -136,6 +136,7 @@
   .setbtn small{display:block; color:var(--dim); font-size:.78rem; margin-top:3px;}
   .hint{color:var(--dim); font-size:.82rem; line-height:1.45; margin-top:8px;}
 .bkban{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:14px 14px 14px 16px;border-radius:16px;border:1px solid #c89b3c;background:linear-gradient(135deg,#3a2f17,#1d1a14)}.bkban div{flex:1;min-width:0}.bkban b{display:block;color:#f3d98f;font-size:15px}.bkban span{display:block;color:#cdbf9c;font-size:13px;margin-top:3px;line-height:1.35}.bkban button{flex:none;border:0;border-radius:12px;padding:11px 14px;background:linear-gradient(135deg,#f3d98f,#c89b3c 60%,#a7782a);color:#14181d;font:700 14px Inter,sans-serif;cursor:pointer}
+.ttl .latetxt{display:block;color:#e8a33d;font-size:12px;margin-top:2px;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3}
 .instbtn{display:block;width:100%;margin:0 0 14px;padding:16px;border:0;border-radius:16px;background:linear-gradient(135deg,#f3d98f,#c89b3c 60%,#a7782a);color:#14181d;font:700 17px Inter,sans-serif;box-shadow:0 6px 18px #0006;cursor:pointer}
 </style>
 </head>
@@ -2194,6 +2195,16 @@ function togglePaid(id,m){
 function chk(id,m){ const k=id+'|'+m, on=isPaid(id,m), op=unlocked.has(k);
   return `<div class="chkw" data-k="${k}" onclick="event.stopPropagation()"><button type="button" class="lk ${op?'open':'closed'}" aria-label="${op?'Verrouiller':'Déverrouiller'}" onclick="toggleLk('${id}','${m}')">${op?LK_OPEN:LK_CLOSED}</button><button type="button" class="chk ${on?'on':''} ${op?'':'locked'}" aria-label="${on?'Réglé':'Pas encore réglé'}" onclick="togglePaid('${id}','${m}')">${on?'✓':''}</button></div>`; }
 function recActive(r,m){ return r.from<=m && (!r.to || r.to>=m); }
+// impayés reportés : un prélèvement pas coché revient le mois suivant, montant cumulé
+function prevM(m){ const [y,mo]=m.split('-').map(Number); return ym(new Date(y,mo-2,1)); }
+function recSettled(r,m){ return isPaid(r.id,m)||data.exp.some(e=>e.rec===r.id&&e.d.slice(0,7)===m); }
+function recArrears(r,m){ const now=ym(new Date()), st=data.arrFrom||now, out=[]; if(m>now) return out;
+  for(let p=prevM(m); p>=st && p>=r.from; p=prevM(p)){ if(!recActive(r,p)) continue; if(recSettled(r,p)) break; if(p<now) out.unshift(p); }
+  return out; }
+function recCarried(r,m){ return m<ym(new Date()) && m>=(data.arrFrom||'9999') && !recSettled(r,m); }
+function recDue(r,m){ const late=recArrears(r,m); return {a:r.a*(1+late.length), late, base:r.a}; }
+function monShort(m){ const [y,mo]=m.split('-').map(Number); return new Date(y,mo-1,1).toLocaleDateString('fr-FR',{month:'long'}); }
+function lateTxt(e){ return e.late&&e.late.length?`<span class="latetxt">dont ${fmt(e.base*e.late.length)} de retard (${e.late.map(monShort).join(', ')})</span>`:''; }
 // une ligne du relevé qui correspond à un prélèvement suivi = ce prélèvement, réglé (compté une seule fois)
 const REC_STOP=new Set(['prelevement','prlv','abonnement','sepa','france','des','les','pour','par','and']);
 function recTokens(t){ return normTxt(t).split(/[^a-z0-9]+/).filter(w=>w.length>=3&&!REC_STOP.has(w)); }
@@ -2216,7 +2227,8 @@ function monthEntries(m){
   const out=data.exp.filter(e=>e.d.slice(0,7)===m).map(e=>({...e, kind:'exp'}));
   data.rec.filter(r=>recActive(r,m)&&!data.exp.some(e=>e.rec===r.id&&e.d.slice(0,7)===m)).forEach(r=>{
     const d=m+'-'+pad(Math.min(r.day,daysIn(y,mo)));
-    out.push({id:r.id, a:r.a, c:r.c, n:r.n, d, m, kind:'rec', done:isPaid(r.id,m), late:d<=t});
+    const du=recDue(r,m), car=recCarried(r,m);
+    out.push({id:r.id, a:car?0:du.a, a0:du.a, c:r.c, n:r.n, d, m, kind:'rec', done:isPaid(r.id,m), late:du.late, base:r.a, carried:car, past:d<=t});
   });
   return out.sort((a,b)=>b.d.localeCompare(a.d) || (a.kind==='rec')-(b.kind==='rec'));
 }
@@ -2235,6 +2247,7 @@ function setTab(t){ tab=t; render(); window.scrollTo(0,0); }
 
 function render(){
   keepView();
+  if(!data.arrFrom){ data.arrFrom=ym(new Date()); save(); }
   if(recLink()) save();
   const titles={mois:'Dépenses',rec:'Prélèvements',stats:'Analyse',set:'Réglages'};
   const nav=(tab==='mois'||tab==='stats'||tab==='rec')?`<div class="monthnav"><button onclick="shiftMonth(-1)" aria-label="Mois précédent">‹</button><b>${esc(monthLabel(cur))}</b><button onclick="shiftMonth(1)" aria-label="Mois suivant">›</button></div>`:'';
@@ -2248,14 +2261,14 @@ function render(){
 function viewMonth(){
   const all=monthEntries(cur), t=todayStr();
   const spent=sum(all.filter(e=>e.kind==='exp'||e.done));
-  const upcoming=sum(all.filter(e=>e.kind==='rec'&&!e.done));
+  const upcoming=sum(all.filter(e=>e.kind==='rec'&&!e.done&&!e.carried));
   const total=spent+upcoming;
   const todayAmt=sum(all.filter(e=>e.d===t&&(e.kind==='exp'||e.done)));
   const isCur=cur===ym(new Date());
   const [y,mo]=cur.split('-').map(Number);
   const dayN=isCur?new Date().getDate():daysIn(y,mo);
   const avg=sum(all.filter(e=>e.kind==='exp'))/Math.max(1,dayN);
-  let hero=`<div class="hero"><div class="duo"><div class="duoc" onclick="showSpent()"><small>Déjà dépensé ›</small><div class="big">${fmt(spent)}</div></div><div class="sep"></div><div class="duoc" onclick="showTodo()"><small>Reste à payer ›</small><div class="big" style="color:var(--text)">${fmt(upcoming)}</div>${(n=>n?`<div class="mini">${n} prélèvement${n>1?'s':''} à régler</div>`:'<div class="mini" style="color:var(--green)">✓ Tout est réglé</div>')(all.filter(e=>e.kind==='rec'&&!e.done).length)}</div></div>`;
+  let hero=`<div class="hero"><div class="duo"><div class="duoc" onclick="showSpent()"><small>Déjà dépensé ›</small><div class="big">${fmt(spent)}</div></div><div class="sep"></div><div class="duoc" onclick="showTodo()"><small>Reste à payer ›</small><div class="big" style="color:var(--text)">${fmt(upcoming)}</div>${(n=>n?`<div class="mini">${n} prélèvement${n>1?'s':''} à régler</div>`:'<div class="mini" style="color:var(--green)">✓ Tout est réglé</div>')(all.filter(e=>e.kind==='rec'&&!e.done&&!e.carried).length)}</div></div>`;
   if(data.budget>0){
     const left=data.budget-total, pct=Math.min(100,total/data.budget*100);
     hero+=`<div class="sub">${left>=0?'Budget : il te restera <b style="color:var(--text)">'+fmt(left)+'</b> sur '+fmt(data.budget)+' une fois tout payé':'<b style="color:var(--red)">Budget dépassé de '+fmt(-left)+'</b>'}</div><div class="bar ${left<0?'over':''}"><i style="width:${pct}%"></i></div>`;
@@ -2266,9 +2279,9 @@ function viewMonth(){
     <div class="tile click" onclick="showAll()"><small>Total prévu ›</small><b>${fmt(total)}</b></div></div>`;
   const incM=incList().filter(x=>x.d.slice(0,7)===cur).map(x=>({...x, kind:'inc'}));
   if(!all.length&&!incM.length) return hero+tiles+stmHtml(cur)+impBtnHtml()+`<div class="empty">Aucune dépense ce mois-ci.<br>Appuie sur <b>+ Dépense</b> pour noter ta première sortie d'argent.</div>`;
-  const todo=all.filter(e=>e.kind==='rec'&&!e.done).sort((a,b)=>a.d.localeCompare(b.d));
+  const todo=all.filter(e=>e.kind==='rec'&&!e.done&&!e.carried).sort((a,b)=>a.d.localeCompare(b.d));
   const todoHtml=todo.length?`<div class="day"><div class="dayh"><span style="color:var(--brass2); text-transform:none">⏳ À payer (${todo.length})</span><b>${fmt(sum(todo))}</b></div><div class="card">${todo.map(e=>rowHtml({...e,showD:1})).join('')}</div></div><div class="dayh" style="margin:16px 4px 0"><span style="text-transform:none">Déjà payé, jour par jour</span><b></b></div>`:'';
-  const groups={}; all.filter(e=>!(e.kind==='rec'&&!e.done)).concat(incM).forEach(e=>{ (groups[e.d]=groups[e.d]||[]).push(e); });
+  const groups={}; all.filter(e=>!(e.kind==='rec'&&!e.done&&!e.carried)).concat(incM).forEach(e=>{ (groups[e.d]=groups[e.d]||[]).push(e); });
   const list=Object.keys(groups).sort().reverse().map(d=>{
     const g=groups[d], dd=new Date(d+'T12:00:00');
     let lab=dd.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
@@ -2308,7 +2321,7 @@ function showToday(){
 }
 function showAll(){ const list=monthEntries(cur); detailSheet('Total prévu', 'Tout ce qui sort en '+monthLabel(cur)+', déjà payé et à venir', list, 'Rien de prévu ce mois-ci.', true, false); }
 function showSpent(){ const list=monthEntries(cur).filter(e=>e.kind==='exp'||e.done); detailSheet('Déjà dépensé', 'Tout ce qui est sorti en '+monthLabel(cur), list, 'Rien de dépensé ce mois-ci.', true, false); }
-function showTodo(){ const list=monthEntries(cur).filter(e=>e.kind==='rec'&&!e.done).sort((a,b)=>a.d.localeCompare(b.d)); detailSheet('Reste à payer', 'Prélèvements pas encore réglés en '+monthLabel(cur), list, '✓ Tout est réglé ce mois-ci.', false, true); }
+function showTodo(){ const list=monthEntries(cur).filter(e=>e.kind==='rec'&&!e.done&&!e.carried).sort((a,b)=>a.d.localeCompare(b.d)); detailSheet('Reste à payer', 'Prélèvements pas encore réglés en '+monthLabel(cur), list, '✓ Tout est réglé ce mois-ci.', false, true); }
 function expTap(id){ const e=data.exp.find(x=>x.id===id); if(!e) return; if(e.src==='imp') showExp(id); else editExp(id); }
 function showExp(id){
   const e=data.exp.find(x=>x.id===id); if(!e) return; const c=catOf(e.c);
@@ -2321,19 +2334,20 @@ function showExp(id){
 }
 function rowHtml(e){
   const c=catOf(e.c);
-  const tag=e.kind==='rec'?`<span class="tag ${e.done?'':'todo'}">${e.done?'réglé':(e.late?'à régler':'à venir')}</span>`:'';
+  const tag=e.kind==='rec'?`<span class="tag ${e.done?'':'todo'}">${e.done?'réglé':e.carried?'reporté':(e.past?'à régler':'à venir')}</span>`:'';
   const click=e.kind==='rec'?`recTap('${e.id}','${e.m}')`:`expTap('${e.id}')`;
-  return `<div class="row${e.kind==='rec'&&!unlocked.has(e.id+'|'+e.m)?' lockedrow':''}"${e.kind==='rec'?` data-k="${e.id}|${e.m}"`:''} onclick="${click}">${e.kind==='rec'?chk(e.id,e.m):''}<div class="ico">${c.i}</div><div class="ttl"><b>${esc(e.n||c.l)}${tag}</b><span>${e.showD?esc(new Date(e.d+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}))+' · ':''}${esc(c.l)}${e.kind==='exp'?payLbl(e):''}</span></div><div class="amt"${e.kind==='rec'&&!e.done?' style="color:var(--dim)"':''}>−${fmt(e.a)}</div></div>`;
+  return `<div class="row${e.kind==='rec'&&!unlocked.has(e.id+'|'+e.m)?' lockedrow':''}"${e.kind==='rec'?` data-k="${e.id}|${e.m}"`:''} onclick="${click}">${e.kind==='rec'?chk(e.id,e.m):''}<div class="ico">${c.i}</div><div class="ttl"><b>${esc(e.n||c.l)}${tag}</b><span>${e.showD?esc(new Date(e.d+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}))+' · ':''}${esc(c.l)}${e.kind==='exp'?payLbl(e):''}${e.carried?' · reporté au mois suivant':''}</span>${e.kind==='rec'?lateTxt(e):''}</div><div class="amt"${e.kind==='rec'&&!e.done?' style="color:var(--dim)'+(e.carried?';text-decoration:line-through':'')+'"':''}>−${fmt(e.carried?e.a0:e.a)}</div></div>`;
 }
 
 function viewRec(){
   const m=cur, act=data.rec.filter(r=>recActive(r,m)).sort((a,b)=>a.day-b.day);
   const old=data.rec.filter(r=>r.to&&r.to<m);
-  const tot=sum(act), paidL=act.filter(r=>isPaid(r.id,m)), paidAmt=sum(paidL), left=tot-paidAmt;
+  const due=r=>recCarried(r,m)?0:recDue(r,m).a, sm=l=>l.reduce((x,r)=>x+due(r),0);
+  const tot=sm(act), paidL=act.filter(r=>isPaid(r.id,m)), paidAmt=sm(paidL), left=tot-paidAmt;
   let h=`<div class="hero"><small>À payer en ${esc(monthLabel(m))}</small><div class="big">${fmt(tot)}</div>`+
     (act.length?`<div class="sub">${left>0?'Déjà réglé <b style="color:var(--text)">'+fmt(paidAmt)+'</b> · Reste à régler <b style="color:var(--brass2)">'+fmt(left)+'</b>':'<b style="color:var(--green)">✓ Tout est réglé ce mois-ci</b>'}</div><div class="bar"><i style="width:${tot?paidAmt/tot*100:0}%"></i></div>`:`<div class="sub">Loyer, abonnements, crédits… Ils s'ajoutent automatiquement chaque mois.</div>`)+`</div>`;
   if(!act.length) h+=`<div class="empty">Aucun prélèvement enregistré.<br>Ajoute tout ce qui sort de ton compte chaque mois (loyer, téléphone, abonnements…) avec <b>+ Prélèvement</b>. Tu sauras ainsi combien tu dois payer chaque mois.</div>`;
-  else h+=`<div class="sec"><h2>Chaque mois</h2><span>${paidL.length} réglé${paidL.length>1?'s':''} sur ${act.length}</span></div><div class="card">${act.map(r=>{const c=catOf(r.c), on=isPaid(r.id,m);return `<div class="row${on?' paid':''}${unlocked.has(r.id+'|'+m)?'':' lockedrow'}" data-k="${r.id}|${m}" onclick="recTap('${r.id}','${m}')">${chk(r.id,m)}<div class="ico">${c.i}</div><div class="ttl"><b>${esc(r.n||c.l)}</b><span>Le ${r.day} de chaque mois · ${esc(c.l)}</span></div><div class="amt">−${fmt(r.a)}</div></div>`;}).join('')}</div><div class="hint" style="text-align:center">Chaque ligne est verrouillée. Touche le cadenas pour l'ouvrir, puis coche la case (ou touche la ligne pour la modifier). Toute autre action le referme.</div>`;
+  else h+=`<div class="sec"><h2>Chaque mois</h2><span>${paidL.length} réglé${paidL.length>1?'s':''} sur ${act.length}</span></div><div class="card">${act.map(r=>{const c=catOf(r.c), on=isPaid(r.id,m);return `<div class="row${on?' paid':''}${unlocked.has(r.id+'|'+m)?'':' lockedrow'}" data-k="${r.id}|${m}" onclick="recTap('${r.id}','${m}')">${chk(r.id,m)}<div class="ico">${c.i}</div><div class="ttl"><b>${esc(r.n||c.l)}</b><span>Le ${r.day} de chaque mois · ${esc(c.l)}${recCarried(r,m)?' · reporté au mois suivant':''}</span>${lateTxt({...recDue(r,m)})}</div><div class="amt"${recCarried(r,m)?' style="text-decoration:line-through;color:var(--dim)"':''}>−${fmt(recDue(r,m).a)}</div></div>`;}).join('')}</div><div class="hint" style="text-align:center">Chaque ligne est verrouillée. Touche le cadenas pour l'ouvrir, puis coche la case (ou touche la ligne pour la modifier). Toute autre action le referme.</div>`;
   if(old.length) h+=`<div class="sec"><h2>Arrêtés</h2></div><div class="card">${old.map(r=>{const c=catOf(r.c);return `<div class="row" onclick="editRec('${r.id}')" style="opacity:.6"><div class="ico">${c.i}</div><div class="ttl"><b>${esc(r.n||c.l)}</b><span>Dernier en ${esc(monthLabel(r.to))}</span></div><div class="amt">−${fmt(r.a)}</div></div>`;}).join('')}</div>`;
   return h;
 }

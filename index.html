@@ -2163,6 +2163,7 @@ async function save(){
   data.ts=Date.now();
   let local=false; try{ localStorage.setItem(LS,JSON.stringify(data)); local=true; }catch(e){}
   clearTimeout(saveT);
+  drvSchedule();
   saveT=setTimeout(async()=>{ const r=docRef(); if(r){ try{ await r.set(data); }catch(e){ if(!local) toast('⚠️ Impossible d\'enregistrer'); } } else if(!local) toast('⚠️ Impossible d\'enregistrer'); },400);
 }
 
@@ -2377,7 +2378,10 @@ function viewSet(){
   <button class="setbtn" onclick="document.getElementById('bkfile').click()"><b>📂 Restaurer une sauvegarde</b><small>Remet tes données à partir d'un fichier de sauvegarde (nouveau téléphone…)</small></button>
   <input id="bkfile" type="file" accept=".json,application/json" style="display:none" onchange="backupLoad(this)">
   <button class="setbtn" onclick="exportCsv()"><b>📄 Exporter en tableur (CSV)</b><small>Toutes tes dépenses et prélèvements, pour Excel ou Google Sheets</small></button>
-  <div class="hint" style="margin-top:18px">Tes données restent sur ce téléphone, rien n'est envoyé ailleurs. Pense à sauvegarder de temps en temps pour garder une copie.</div>`;
+  <div class="setbtn" style="cursor:default"><b>☁️ Sauvegarde automatique sur Google Drive</b><small>Une copie complète part sur ton Google Drive (dossier « ${DRV_FOLDER} ») après chaque ajout ou modification, et au moins une fois par jour.</small>
+    <div style="display:flex; gap:8px; margin-top:10px"><input id="drvUrl" placeholder="Colle ici le lien du script Google" style="flex:1; font-size:.8rem" value="${esc(drvUrl())}" onchange="drvSaveUrl()"><button type="button" onclick="drvSaveUrl(); drvUpload(true)" style="padding:10px 14px">Tester</button></div>
+    <div id="drvInfo" style="font-size:.8rem; margin-top:8px; color:var(--brass2)">${esc(drvInfoTxt())}</div></div>
+  <div class="hint" style="margin-top:18px">Tes données sont gardées sur ce téléphone et copiées sur ton Google Drive quand la sauvegarde automatique est activée.</div>`;
 }
 
 /* ---------- Formulaires ---------- */
@@ -2958,11 +2962,15 @@ function doSearch(){
 
 /* ---------- Sauvegarde ---------- */
 function blobToB64(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result)); r.onerror=()=>rej(r.error); r.readAsDataURL(b); }); }
-async function backupSave(){
-  toast('Préparation de la sauvegarde…');
+async function buildBackup(){
   const files={}; let miss=0;
   for(const st of stmList()){ try{ const b=await stmBlob(st); if(b) files[st.id]=await blobToB64(b); else miss++; }catch(e){ miss++; } }
-  const name='depenses-sauvegarde-'+todayStr()+'.json', blob=new Blob([JSON.stringify({app:'depenses', v:2, date:new Date().toISOString(), data, files})],{type:'application/json'});
+  const json=JSON.stringify({app:'depenses', v:2, date:new Date().toISOString(), data, files, drv:drvUrl()});
+  return {name:'depenses-sauvegarde-'+todayStr()+'.json', json, miss};
+}
+async function backupSave(){
+  toast('Préparation de la sauvegarde…');
+  const {name, json, miss}=await buildBackup(), blob=new Blob([json],{type:'application/json'});
   if(miss) toast('⚠️ '+miss+' relevé(s) PDF introuvable(s), le reste est sauvegardé');
   try{ const d=window.claude&&claude.use?await claude.use('downloads'):null; if(d){ await d.save({filename:name, data:blob}); bkDone(); toast('✓ Sauvegarde enregistrée'); return; } }catch(e){ if(e&&e.code==='declined') return; }
   try{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); bkDone(); toast('✓ Sauvegarde enregistrée'); }catch(e){ toast('Sauvegarde impossible ici'); }
@@ -2970,7 +2978,7 @@ async function backupSave(){
 let restoreData=null, restoreFiles={};
 async function backupLoad(inp){
   const f=inp.files&&inp.files[0]; inp.value=''; if(!f) return;
-  try{ const o=JSON.parse(await f.text()); const d=o&&o.app==='depenses'?o.data:o; if(!d||!Array.isArray(d.exp)) throw 0; restoreData=d; restoreFiles=(o&&o.files)||{}; restoreDate=o.date||'';
+  try{ const o=JSON.parse(await f.text()); const d=o&&o.app==='depenses'?o.data:o; if(!d||!Array.isArray(d.exp)) throw 0; restoreData=d; restoreFiles=(o&&o.files)||{}; restoreDate=o.date||''; if(o&&o.drv&&!drvUrl()){ try{ localStorage.setItem(DRV_URL,o.drv); }catch(e){} }
     const dt=o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'';
     openModal(`<h2>Restaurer cette sauvegarde ?</h2><div class="hint">Sauvegarde${dt?' du '+esc(dt):''} : ${d.exp.length} dépense${d.exp.length>1?'s':''}, ${(d.rec||[]).length} prélèvement${(d.rec||[]).length>1?'s':''}${(d.inc||[]).length?', '+d.inc.length+' entrée'+(d.inc.length>1?'s':'')+' d\'argent':''}${Object.keys(restoreFiles).length?', '+Object.keys(restoreFiles).length+' relevé'+(Object.keys(restoreFiles).length>1?'s':'')+' PDF':''}.<br><b style="color:var(--text)">Elle remplace tout ce qu'il y a dans l'appli maintenant.</b></div><div class="row2"><button onclick="closeModal()">Annuler</button><button class="primary" onclick="backupApply()">Restaurer</button></div>`);
   }catch(e){ openModal(`<h2>Fichier non reconnu</h2><div class="hint">Choisis un fichier de sauvegarde « depenses-sauvegarde-….json » créé par l'appli.</div><div class="row2"><button class="primary" onclick="closeModal()">D'accord</button></div>`); }
@@ -2982,7 +2990,7 @@ function bkDone(){ bkSet(); render(); }
 function bkDays(){ const t=bkGet(); return t==null?null:Math.floor((Date.now()-t)/86400000); }
 function bkLastTxt(){ const t=bkGet(); if(t==null) return 'Aucune sauvegarde faite sur cet appareil pour l\'instant.'; const n=bkDays();
   return 'Dernière sauvegarde : '+new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+(n<=0?' (aujourd\'hui)':n===1?' (hier)':' (il y a '+n+' jours)'); }
-function bkBanner(){ if(bkGet()==null&&data.exp.length&&!localStorage.getItem('depenses_bkinit')){ try{ localStorage.setItem('depenses_bkinit','1'); }catch(e){} bkSet(); return ''; } const n=bkDays(); if(n!=null&&n<BK_DAYS) return '';
+function bkBanner(){ if(bkGet()==null&&data.exp.length&&!localStorage.getItem('depenses_bkinit')){ try{ localStorage.setItem('depenses_bkinit','1'); }catch(e){} bkSet(); return ''; } if(drvUrl() && Date.now()-drvLast() < 3*86400000) return ''; const n=bkDays(); if(n!=null&&n<BK_DAYS) return '';
   return `<div class="bkban"><div><b>💾 Pense à sauvegarder tes données</b><span>${n==null?'Tu n\'as encore jamais sauvegardé sur cet appareil.':'Ta dernière sauvegarde date de '+n+' jours.'} Une sauvegarde tous les 2 mois, c'est plus sûr.</span></div><button onclick="backupSave()">Sauvegarder</button></div>`; }
 async function backupApply(){ if(!restoreData) return;
   const nd=Object.assign({v:1,exp:[],rec:[],budget:0,cats:[],paid:{}},restoreData), F=restoreFiles; restoreData=null; restoreFiles={}; bkSet(restoreDate||Date.now());
@@ -2995,6 +3003,48 @@ async function backupApply(){ if(!restoreData) return;
     }catch(e){ bad++; }
   }
   data=nd; save(); render(); toast(bad?'⚠️ Restauré, mais '+bad+' relevé(s) PDF illisible(s)':'✓ Sauvegarde restaurée, relevés compris'); }
+
+/* ---------- Sauvegarde automatique Google Drive (même script Google que Coffre et Vente) ---------- */
+const DRV_URL='depenses_drive_url', DRV_LAST='depenses_drive_last', DRV_PENDING='depenses_drive_pending', DRV_FOLDER='Dépenses - Sauvegardes', DRV_DL='depenses_lastdl';
+let drvTimer=null, drvBusy=false;
+function lsGet(k){ try{ return localStorage.getItem(k)||''; }catch(e){ return ''; } }
+function lsSet(k,v){ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} }
+function drvUrl(){ return (lsGet(DRV_URL)||lsGet('coffre_drive_url')||lsGet('vente_drive_url')).trim(); }
+function drvLast(){ return parseInt(lsGet(DRV_LAST)||'0',10)||0; }
+function drvInfoTxt(){
+  if(!drvUrl()) return 'Pas encore activée : colle le même lien que dans Vente ou Coffre.';
+  const t=drvLast(); let s=t?'✓ Activée. Dernier envoi : '+new Date(t).toLocaleString('fr-FR',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'Activée, premier envoi dans quelques secondes.';
+  if(lsGet(DRV_PENDING)) s+=' (modifications en attente d\'envoi)'; return s; }
+function drvShow(msg,ok){ const el=document.getElementById('drvInfo'); if(!el) return; el.textContent=msg||drvInfoTxt(); el.style.color=msg?(ok?'var(--green)':'var(--red)'):'var(--brass2)'; }
+function drvSaveUrl(){ const e=document.getElementById('drvUrl'); if(!e) return; const v=e.value.trim(); lsSet(DRV_URL, v||null); drvShow(); }
+async function drvUpload(manual){
+  const url=drvUrl();
+  if(!url){ if(manual) drvShow('Colle d\'abord le lien du script Google.',false); return; }
+  if(drvBusy) return; drvBusy=true; clearTimeout(drvTimer);
+  if(manual) drvShow('Envoi en cours…',true);
+  try{
+    const {name, json}=await buildBackup();
+    const ctl=new AbortController(), to=setTimeout(()=>ctl.abort(),120000); let txt='';
+    try{ const res=await fetch(url,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({nom:name.replace('.json','-'+new Date().toTimeString().slice(0,5).replace(':','h')+'.json'), contenu:json, dossier:DRV_FOLDER, garder:60}), signal:ctl.signal}); txt=(await res.text()).trim(); }finally{ clearTimeout(to); }
+    if(txt!=='ok') throw new Error(txt.slice(0,60));
+    lsSet(DRV_LAST,String(Date.now())); lsSet(DRV_PENDING,null); if(!lsGet(DRV_URL)) lsSet(DRV_URL,url);
+    drvShow(manual?'✓ Sauvegarde envoyée sur ton Google Drive':'',true); if(!manual) drvShow();
+  }catch(e){ if(manual) drvShow(navigator.onLine?'Échec de l\'envoi : vérifie le lien du script.':'Pas de connexion : l\'envoi se fera dès que tu auras internet.',false); }
+  finally{ drvBusy=false; }
+}
+function drvSchedule(){ if(!drvUrl()) return; lsSet(DRV_PENDING,'1'); clearTimeout(drvTimer); drvTimer=setTimeout(()=>drvUpload(false),15000); }
+function drvCheck(){ if(!drvUrl()||!navigator.onLine||!data||!data.ts) return; if(lsGet(DRV_PENDING) || Date.now()-drvLast()>24*3600000) drvUpload(false); }
+window.addEventListener('online', drvCheck);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ if(lsGet(DRV_PENDING)){ clearTimeout(drvTimer); drvUpload(false); } } else drvCheck(); });
+setTimeout(drvCheck, 5000); setInterval(drvCheck, 3600000);
+// copie aussi dans les Téléchargements du téléphone, au plus une fois par jour, après une modification
+let dlBusy=false;
+document.addEventListener('pointerup', async()=>{
+  if(dlBusy || !data || !data.ts || !(data.exp||[]).length) return;
+  const last=parseInt(lsGet(DRV_DL)||'0',10); if(data.ts<=last || Date.now()-last<24*3600000) return;
+  dlBusy=true;
+  try{ const {name,json}=await buildBackup(); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); lsSet(DRV_DL,String(Date.now())); bkSet(); toast('✓ Sauvegarde automatique sur le téléphone'); }catch(e){} finally{ dlBusy=false; }
+}, true);
 
 let toastT;
 function toast(t){ const el=$('#toast'); el.innerHTML='<div class="toast">'+esc(t)+'</div>'; clearTimeout(toastT); toastT=setTimeout(()=>{el.innerHTML='';},2400); }

@@ -2962,9 +2962,9 @@ function doSearch(){
 
 /* ---------- Sauvegarde ---------- */
 function blobToB64(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result)); r.onerror=()=>rej(r.error); r.readAsDataURL(b); }); }
-async function buildBackup(){
+async function buildBackup(light){
   const files={}; let miss=0;
-  for(const st of stmList()){ try{ const b=await stmBlob(st); if(b) files[st.id]=await blobToB64(b); else miss++; }catch(e){ miss++; } }
+  if(!light) for(const st of stmList()){ try{ const b=await stmBlob(st); if(b) files[st.id]=await blobToB64(b); else miss++; }catch(e){ miss++; } }
   const json=JSON.stringify({app:'depenses', v:2, date:new Date().toISOString(), data, files, drv:drvUrl()});
   return {name:'depenses-sauvegarde-'+todayStr()+'.json', json, miss};
 }
@@ -3024,16 +3024,24 @@ async function drvUpload(manual){
   if(drvBusy) return; drvBusy=true; clearTimeout(drvTimer);
   if(manual) drvShow('Envoi en cours…',true);
   try{
-    const {name, json}=await buildBackup();
+    // à chaque modification : copie légère (sans les relevés PDF), envoyée tout de suite et qui continue même si l'appli se ferme ; copie complète une fois par jour
+    const light=!manual && Date.now()-parseInt(lsGet('depenses_drive_full')||'0',10)<24*3600000;
+    const {name, json}=await buildBackup(light);
+    const body=JSON.stringify({nom:name.replace('.json','-'+new Date().toTimeString().slice(0,5).replace(':','h')+(light?'-rapide':'')+'.json'), contenu:json, dossier:DRV_FOLDER, garder:200});
+    if(light && body.length<60000){
+      lsSet(DRV_LAST,String(Date.now())); lsSet(DRV_PENDING,null);
+      await fetch(url,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body, keepalive:true, mode:'no-cors'});
+      drvShow(); return;
+    }
     const ctl=new AbortController(), to=setTimeout(()=>ctl.abort(),120000); let txt='';
-    try{ const res=await fetch(url,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({nom:name.replace('.json','-'+new Date().toTimeString().slice(0,5).replace(':','h')+'.json'), contenu:json, dossier:DRV_FOLDER, garder:60}), signal:ctl.signal}); txt=(await res.text()).trim(); }finally{ clearTimeout(to); }
+    try{ const res=await fetch(url,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body, signal:ctl.signal}); txt=(await res.text()).trim(); }finally{ clearTimeout(to); }
     if(txt!=='ok') throw new Error(txt.slice(0,60));
-    lsSet(DRV_LAST,String(Date.now())); lsSet(DRV_PENDING,null); if(!lsGet(DRV_URL)) lsSet(DRV_URL,url);
+    lsSet(DRV_LAST,String(Date.now())); lsSet(DRV_PENDING,null); if(!light) lsSet('depenses_drive_full',String(Date.now())); if(!lsGet(DRV_URL)) lsSet(DRV_URL,url);
     drvShow(manual?'✓ Sauvegarde envoyée sur ton Google Drive':'',true); if(!manual) drvShow();
   }catch(e){ if(manual) drvShow(navigator.onLine?'Échec de l\'envoi : vérifie le lien du script.':'Pas de connexion : l\'envoi se fera dès que tu auras internet.',false); }
   finally{ drvBusy=false; }
 }
-function drvSchedule(){ if(!drvUrl()) return; lsSet(DRV_PENDING,'1'); clearTimeout(drvTimer); drvTimer=setTimeout(()=>drvUpload(false),15000); }
+function drvSchedule(){ if(!drvUrl()) return; lsSet(DRV_PENDING,'1'); clearTimeout(drvTimer); drvTimer=setTimeout(()=>drvUpload(false),1500); }
 function drvCheck(){ if(!drvUrl()||!navigator.onLine||!data||!data.ts) return; if(lsGet(DRV_PENDING) || Date.now()-drvLast()>24*3600000) drvUpload(false); }
 window.addEventListener('online', drvCheck);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ if(lsGet(DRV_PENDING)){ clearTimeout(drvTimer); drvUpload(false); } } else drvCheck(); });

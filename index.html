@@ -3020,6 +3020,7 @@ function drvSaveUrl(){ const e=document.getElementById('drvUrl'); if(!e) return;
 async function drvUpload(manual){
   const url=drvUrl();
   if(!url){ if(manual) drvShow('Colle d\'abord le lien du script Google.',false); return; }
+  if(!manual && !(data&&((data.exp||[]).length||(data.rec||[]).length||(data.inc||[]).length))) return; // ne jamais envoyer une appli vide (après un effacement du téléphone)
   if(drvBusy) return; drvBusy=true; clearTimeout(drvTimer);
   if(manual) drvShow('Envoi en cours…',true);
   try{

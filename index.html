@@ -2389,7 +2389,7 @@ let fCat='courses', fPay='cb';
 function openModal(h){ $('#modal').innerHTML='<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">'+h+'</div></div>'; }
 function closeModal(){ $('#modal').innerHTML=''; }
 let instEvt=null;
-function isInstalled(){ return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true; }
+function isInstalled(){ return !!window.AndroidSave||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true; }
 window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); instEvt=e; if(tab==='mois') render(); });
 window.addEventListener('appinstalled',()=>{ instEvt=null; toast('✓ Appli installée sur ton téléphone'); render(); });
 function installBanner(){ if(isInstalled()) return ''; return '<button class="instbtn" onclick="installApp()">📲 Installer sur mon téléphone</button>'; }

@@ -1,5 +1,5 @@
-const CACHE='depenses-drive-4';
-const FILES=['./','index.html','manifest.json','icon-192.png','icon-512.png','lib/pdf.min.js','lib/pdf.worker.min.js'];
+const CACHE='depenses-drive-5';
+const FILES=['./','index.html','manifest.json','icon-192.png','icon-512.png','fonts/fonts.css','fonts/CormorantGaramond-latin.woff2','fonts/SourceSans3-latin.woff2','lib/pdf.min.js','lib/pdf.worker.min.js'];
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k))))); self.clients.claim(); });
 self.addEventListener('fetch',e=>{

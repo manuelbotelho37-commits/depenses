@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#14181d">
+<meta name="theme-color" content="#0c0c0e">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -12,19 +12,17 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
   :root{
-    --bg:#14181d; --surface:#1c222a; --surface2:#242b34; --line:#323a45;
-    --text:#e9e7e1; --dim:#8b94a1; --brass:#c89b3c; --brass2:#e2bd6a; --green:#5f9e79; --red:#c4635a;
+    --bg:#0c0c0e; --surface:#17171a; --surface2:#1f1e1c; --line:#33302a;
+    --text:#f3ead6; --dim:#a69c86; --brass:#c89b3c; --brass2:#e2bd6a; --green:#5f9e79; --red:#c4635a;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{background:var(--bg);}
-  body{margin:0; min-height:100vh; color:var(--text); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+  body{margin:0; min-height:100vh; color:var(--text); font-family:"Source Sans 3",system-ui,sans-serif; -webkit-font-smoothing:antialiased;
     padding-top:env(safe-area-inset-top,0px);}
-  h1,h2,.serif{font-family:'Fraunces',serif; font-weight:600;}
+  h1,h2,.serif{font-family:"Cormorant Garamond",serif; font-weight:600;}
   .wrap{max-width:640px; margin:0 auto; padding:0 16px calc(150px + env(safe-area-inset-bottom,0px));}
   input,select,textarea{width:100%; padding:14px; background:var(--surface2); border:1px solid var(--line); border-radius:10px; color:var(--text); font-size:1rem; font-family:inherit;}
   input:focus,select:focus,textarea:focus{outline:none; border-color:var(--brass);}
@@ -41,9 +39,9 @@
   .monthnav button{padding:8px 12px; font-size:1.1rem; line-height:1; background:transparent; border-color:transparent; color:var(--brass2);}
   .monthnav b{min-width:118px; text-align:center; font-weight:600; font-size:.95rem; text-transform:capitalize;}
 
-  .hero{background:linear-gradient(145deg,#232a33 0%,#1a1f26 60%,#2a2414 140%); border:1px solid #4a3f22; border-radius:18px; padding:20px 18px; margin-top:8px; position:relative; overflow:hidden;}
+  .hero{background:linear-gradient(145deg,#1f1e1c 0%,#17171a 60%,#2a2414 140%); border:1px solid #4a3f22; border-radius:18px; padding:20px 18px; margin-top:8px; position:relative; overflow:hidden;}
   .hero small{color:var(--dim); font-size:.8rem; text-transform:uppercase; letter-spacing:.08em;}
-  .hero .big{font-family:'Fraunces',serif; font-size:2.6rem; font-weight:600; color:var(--brass2); margin:4px 0 2px; font-variant-numeric:tabular-nums;}
+  .hero .big{font-family:"Cormorant Garamond",serif; font-size:2.6rem; font-weight:600; color:var(--brass2); margin:4px 0 2px; font-variant-numeric:tabular-nums;}
   .hero .sub{color:var(--dim); font-size:.88rem;}
   .bar{height:8px; background:#0f1317; border-radius:6px; overflow:hidden; margin-top:14px;}
   .bar i{display:block; height:100%; background:linear-gradient(90deg,var(--brass),var(--brass2)); border-radius:6px;}
@@ -91,7 +89,7 @@
   .catrow .bar{margin-top:8px; height:6px;}
 
   .fab{position:fixed; right:18px; bottom:calc(84px + env(safe-area-inset-bottom,0px)); background:var(--brass); color:#1a1508; border:none; font-weight:700; padding:16px 22px; border-radius:30px; box-shadow:0 6px 20px rgba(0,0,0,.5); z-index:6;}
-  nav.tabs{position:fixed; left:0; right:0; bottom:0; background:rgba(16,19,23,.96); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; justify-content:center; z-index:7; padding-bottom:env(safe-area-inset-bottom,0px);}
+  nav.tabs{position:fixed; left:0; right:0; bottom:0; background:rgba(14,13,12,.96); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; justify-content:center; z-index:7; padding-bottom:env(safe-area-inset-bottom,0px);}
   nav.tabs .in{display:flex; width:100%; max-width:640px;}
   nav.tabs button{flex:1; background:transparent; border:none; border-radius:0; padding:10px 4px 12px; color:var(--dim); font-size:.74rem; display:flex; flex-direction:column; align-items:center; gap:4px;}
   nav.tabs button svg{width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
@@ -100,7 +98,7 @@
   .overlay{position:fixed; inset:0; background:rgba(0,0,0,.62); display:flex; align-items:flex-end; justify-content:center; z-index:20;}
   .sheet{background:var(--surface); width:100%; max-width:640px; max-height:92vh; overflow:auto; border-radius:20px 20px 0 0; padding:20px 18px calc(18px + env(safe-area-inset-bottom,0px)); border-top:1px solid #4a3f22;}
   .sheet h2{margin:0 0 2px; font-size:1.3rem;}
-  .amountin{font-family:'Fraunces',serif; font-size:2.2rem; font-weight:600; text-align:center; color:var(--brass2); padding:12px; font-variant-numeric:tabular-nums;}
+  .amountin{font-family:"Cormorant Garamond",serif; font-size:2.2rem; font-weight:600; text-align:center; color:var(--brass2); padding:12px; font-variant-numeric:tabular-nums;}
   .seg{display:flex; background:var(--surface2); border:1px solid var(--line); border-radius:12px; padding:4px; margin-top:14px;}
   .seg button{flex:1; border:none; background:transparent; padding:10px 6px; font-size:.88rem; color:var(--dim); border-radius:9px;}
   .seg button.on{background:var(--brass); color:#1a1508; font-weight:600;}
@@ -110,7 +108,7 @@
   .cats button.on{border-color:var(--brass); background:#2a2414; color:var(--brass2);}
   .cats button.addcat{border-style:dashed; border-color:#4a3f22; color:var(--brass2);}
   .cats button.addcat span{color:var(--brass2);}
-  .ncbox{margin-top:10px; padding:14px; border:1px solid #4a3f22; border-radius:12px; background:#1a1f26;}
+  .ncbox{margin-top:10px; padding:14px; border:1px solid #4a3f22; border-radius:12px; background:#17171a;}
   .emos{display:grid; grid-template-columns:repeat(8,1fr); gap:6px;}
   .emos button{padding:8px 0; font-size:1.2rem; background:var(--surface2);}
   .emos button.on{border-color:var(--brass); background:#2a2414;}
@@ -135,9 +133,27 @@
   .setbtn{width:100%; text-align:left; margin-top:10px; background:var(--surface);}
   .setbtn small{display:block; color:var(--dim); font-size:.78rem; margin-top:3px;}
   .hint{color:var(--dim); font-size:.82rem; line-height:1.45; margin-top:8px;}
-.bkban{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:14px 14px 14px 16px;border-radius:16px;border:1px solid #c89b3c;background:linear-gradient(135deg,#3a2f17,#1d1a14)}.bkban div{flex:1;min-width:0}.bkban b{display:block;color:#f3d98f;font-size:15px}.bkban span{display:block;color:#cdbf9c;font-size:13px;margin-top:3px;line-height:1.35}.bkban button{flex:none;border:0;border-radius:12px;padding:11px 14px;background:linear-gradient(135deg,#f3d98f,#c89b3c 60%,#a7782a);color:#14181d;font:700 14px Inter,sans-serif;cursor:pointer}
+.bkban{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:14px 14px 14px 16px;border-radius:16px;border:1px solid #c89b3c;background:linear-gradient(135deg,#3a2f17,#1d1a14)}.bkban div{flex:1;min-width:0}.bkban b{display:block;color:#f3d98f;font-size:15px}.bkban span{display:block;color:#cdbf9c;font-size:13px;margin-top:3px;line-height:1.35}.bkban button{flex:none;border:0;border-radius:12px;padding:11px 14px;background:linear-gradient(135deg,#f3d98f,#c89b3c 60%,#a7782a);color:#0c0c0e;font:700 14px "Source Sans 3",sans-serif;cursor:pointer}
 .ttl .latetxt{display:block;color:#e8a33d;font-size:12px;margin-top:2px;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3}
-.instbtn{display:block;width:100%;margin:0 0 14px;padding:16px;border:0;border-radius:16px;background:linear-gradient(135deg,#f3d98f,#c89b3c 60%,#a7782a);color:#14181d;font:700 17px Inter,sans-serif;box-shadow:0 6px 18px #0006;cursor:pointer}
+.instbtn{display:block;width:100%;margin:0 0 14px;padding:16px;border:0;border-radius:16px;background:linear-gradient(135deg,#f3d98f,#c89b3c 60%,#a7782a);color:#0c0c0e;font:700 17px "Source Sans 3",sans-serif;box-shadow:0 6px 18px #0006;cursor:pointer}
+
+/* Thème Métro Dodo : écriture dorée, or dégradé, noir chaud */
+:root{--bg:#0c0c0e;--surface:#17171a;--surface2:#1f1e1c;--line:#33302a;--text:#f3ead6;--dim:#a69c86;--brass:#d4a94e;--brass2:#e2c275;--brass-dim:#8f7331;
+--s:#17171a;--s2:#1f1e1c;--gold:#d4a94e;--gold2:#e2c275;--mdgold:linear-gradient(135deg,#f7e3a1 0%,#d4a94e 45%,#a87b2c 72%,#ecd08a 100%)}
+html,body{background:radial-gradient(120% 60% at 30% 0%,#26241f 0%,#0c0c0e 60%) fixed,#0c0c0e!important}
+html{font-size:106.25%}
+body{font-family:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif}
+*{font-variant-numeric:lining-nums}
+h1,.titre-or{font-family:"Cormorant Garamond","DejaVu Serif",Georgia,serif!important;background:var(--mdgold);-webkit-background-clip:text;background-clip:text;color:transparent!important;font-weight:600!important;letter-spacing:.01em}
+h1 button,h1 span,h1 a{color:var(--text)}
+header{position:relative!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:8px!important;text-align:center;background:transparent!important;border-bottom:none!important;padding:20px 0 12px!important}
+header::after{content:"";display:block;width:140px;height:1px;margin:4px auto 0;background:linear-gradient(90deg,transparent,#d4a94e,transparent)}
+header h1{font-size:2.6rem!important;font-weight:700!important;line-height:1.1;letter-spacing:.03em}
+header h1 .srch{position:absolute;right:0;top:26px;font-size:1rem}
+button,input,select,textarea{font-family:inherit}
+.primary,.fab,.seg button.on{background:var(--mdgold)!important;color:#111113!important;border-color:transparent!important}
+.seg button:not(.on){color:var(--brass2)}
+.hero .big,.amountin{font-weight:700}
 </style>
 </head>
 <body>
